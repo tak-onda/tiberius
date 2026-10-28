@@ -163,6 +163,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
         self.reset_pending = true;
     }
 
+    /// True if a request has been sent and the last packet of its response
+    /// has not been received yet.
+    pub(crate) fn is_response_pending(&self) -> bool {
+        !self.flushed
+    }
+
     /// Send an item to the wire. Header should define the item type and item should implement
     /// [`Encode`], defining the byte structure for the wire.
     ///

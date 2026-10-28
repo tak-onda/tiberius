@@ -3094,3 +3094,46 @@ where
 
     Ok(())
 }
+
+#[test_on_runtimes]
+async fn is_response_pending_until_the_last_packet_arrives<S>(
+    mut conn: tiberius::Client<S>,
+) -> Result<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send,
+{
+    assert!(
+        !conn.is_response_pending(),
+        "nothing is pending after login"
+    );
+
+    conn.simple_query("SELECT 1").await?.into_results().await?;
+    assert!(
+        !conn.is_response_pending(),
+        "a consumed response is complete"
+    );
+
+    // A small result arrives in one packet, so even an unread stream is
+    // complete on the wire.
+    drop(conn.simple_query("SELECT 1").await?);
+    assert!(
+        !conn.is_response_pending(),
+        "an unread but delivered response"
+    );
+
+    // The first result set is flushed before the server stalls, so the
+    // stream is handed out while the rest of the response is still coming.
+    drop(
+        conn.simple_query(
+            "SELECT 1; RAISERROR('', 0, 1) WITH NOWAIT; WAITFOR DELAY '00:00:01'; SELECT 2",
+        )
+        .await?,
+    );
+    assert!(conn.is_response_pending(), "the server is still executing");
+
+    // The next request reads the rest of the unread response first.
+    conn.simple_query("SELECT 3").await?.into_results().await?;
+    assert!(!conn.is_response_pending());
+
+    Ok(())
+}

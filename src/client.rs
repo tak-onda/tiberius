@@ -264,6 +264,15 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
         self.connection.request_reset();
     }
 
+    /// Returns true if the response to the previous request is still arriving.
+    ///
+    /// The next request on this client first reads the rest of that response
+    /// off the wire, so it waits until the server finishes the previous
+    /// request.
+    pub fn is_response_pending(&self) -> bool {
+        self.connection.is_response_pending()
+    }
+
     /// Execute a `BULK INSERT` statement, efficiantly storing a large number of
     /// rows to a specified table. Note: make sure the input row follows the same
     /// schema as the table, otherwise calling `send()` will return an error.
